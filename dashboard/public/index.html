@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flyway Migration Dashboard</title>
+<style>
+  :root {
+    --bg:#f5f6f8; --surface:#ffffff; --text:#1c2230; --muted:#6a7385; --border:#e3e6ec;
+    --green:#1a7f4b; --green-bg:#e3f4ea; --red:#b42318; --red-bg:#fde8e6;
+    --amber:#9a6200; --amber-bg:#fff3d6; --purple:#6b3fc4; --purple-bg:#efe8fb;
+    --gray-bg:#eef0f4; --accent:#3563e9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#12151c; --surface:#1b1f29; --text:#e8ebf2; --muted:#8e97aa; --border:#2a3040;
+      --green:#5fd59a; --green-bg:#16301f; --red:#ff8f85; --red-bg:#3a1a18;
+      --amber:#f2c261; --amber-bg:#35290f; --purple:#b99cff; --purple-bg:#2a2147;
+      --gray-bg:#252a37; --accent:#7b9bff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height:1.45; }
+  .wrap { max-width:1100px; margin:0 auto; padding:28px 20px 48px; }
+  header { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+  h1 { margin:0; font-size:1.5rem; }
+  .sub { color:var(--muted); font-size:.9rem; margin-top:2px; }
+  .live { color:var(--muted); font-size:.85rem; display:flex; align-items:center; gap:8px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--green); }
+  .dot.off { background:var(--red); }
+  .banner { padding:12px 16px; border-radius:10px; margin-bottom:20px; font-weight:600; }
+  .banner.ok { background:var(--green-bg); color:var(--green); }
+  .banner.warn { background:var(--amber-bg); color:var(--amber); }
+  .banner.bad { background:var(--red-bg); color:var(--red); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; margin-bottom:24px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; }
+  .card h2 { margin:0; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; align-items:center; }
+  .big { font-size:2.2rem; font-weight:700; margin:10px 0 2px; }
+  .big small { font-size:.9rem; font-weight:500; color:var(--muted); }
+  .stats { display:flex; gap:16px; font-size:.85rem; color:var(--muted); margin-top:8px; flex-wrap:wrap; }
+  .stats b { color:var(--text); }
+  .badge { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.75rem; font-weight:600; white-space:nowrap; }
+  .b-applied,.b-sync { background:var(--green-bg); color:var(--green); }
+  .b-failed,.b-unreachable { background:var(--red-bg); color:var(--red); }
+  .b-pending,.b-uninitialised { background:var(--amber-bg); color:var(--amber); }
+  .b-drift { background:var(--purple-bg); color:var(--purple); }
+  .b-absent { background:var(--gray-bg); color:var(--muted); }
+  .section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:24px; }
+  .section h3 { margin:0 0 4px; font-size:1.05rem; }
+  .section p.hint { margin:0 0 14px; color:var(--muted); font-size:.85rem; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:.88rem; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  th { color:var(--muted); font-weight:600; font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; }
+  tr:last-child td { border-bottom:none; }
+  td.desc { white-space:normal; min-width:180px; }
+  .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size:.82rem; }
+  .tag { margin-left:6px; font-size:.7rem; font-weight:600; color:var(--purple); background:var(--purple-bg); padding:1px 6px; border-radius:6px; }
+  .tabs { display:flex; gap:6px; margin-bottom:12px; }
+  .tab { border:1px solid var(--border); background:var(--bg); color:var(--text); padding:6px 14px; border-radius:8px; cursor:pointer; font:inherit; font-size:.85rem; }
+  .tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  footer { color:var(--muted); font-size:.8rem; text-align:center; }
+  .empty { color:var(--muted); padding:12px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Flyway Migration Dashboard</h1>
+      <div class="sub">PostgreSQL schema versions across dev, test and prod</div>
+    </div>
+    <div class="live"><span class="dot" id="dot"></span><span id="updated">Loading…</span></div>
+  </header>
+
+  <div id="banner"></div>
+  <div class="grid" id="cards"></div>
+
+  <div class="section">
+    <h3>Migration matrix</h3>
+    <p class="hint">Every migration file against every environment. Pending means the file exists but has not been applied. “differs” means the stored checksum is not the same as in the reference environment.</p>
+    <div class="scroll"><table id="matrix"></table></div>
+  </div>
+
+  <div class="section">
+    <h3>Schema history</h3>
+    <p class="hint">Live contents of <span class="mono">flyway_schema_history</span>.</p>
+    <div class="tabs" id="tabs"></div>
+    <div class="scroll"><table id="history"></table></div>
+  </div>
+
+  <footer>Read-only view. Refreshes every 3 seconds. This page never changes any database.</footer>
+</div>
+
+<script>
+const ENVS = ['dev', 'test', 'prod'];
+const LABEL = {
+  applied: 'Applied', failed: 'Failed', pending: 'Pending', absent: '—',
+  sync: 'In sync', drift: 'Drifted', unreachable: 'Unreachable', uninitialised: 'Not initialised'
+};
+let selected = 'dev';
+let lastState = null;
+
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const badge = (cls, text) => `<span class="badge b-${cls}">${esc(text)}</span>`;
+
+function renderBanner(s) {
+  const bad = s.envs.filter((e) => e.status === 'unreachable' || e.status === 'failed');
+  const warn = s.envs.filter((e) => e.status === 'pending' || e.status === 'drift' || e.status === 'uninitialised');
+  let cls = 'ok', msg = 'All environments are in sync.';
+  if (bad.length) {
+    cls = 'bad';
+    msg = bad.map((e) => `${e.env}: ${LABEL[e.status].toLowerCase()}`).join(' · ');
+  } else if (warn.length) {
+    cls = 'warn';
+    msg = warn.map((e) => `${e.env}: ${LABEL[e.status].toLowerCase()}`).join(' · ');
+  }
+  document.getElementById('banner').innerHTML = `<div class="banner ${cls}">${esc(msg)}</div>`;
+}
+
+function renderCards(s) {
+  document.getElementById('cards').innerHTML = s.envs.map((e) => {
+    const current = e.current ? `v${esc(e.current)}` : '—';
+    const note = e.error ? `<div class="stats">${esc(e.error)}</div>` : '';
+    return `<div class="card">
+      <h2>${esc(e.env)} ${badge(e.status, LABEL[e.status])}</h2>
+      <div class="big">${current} <small>current version</small></div>
+      <div class="stats">
+        <span><b>${e.applied}</b> applied</span>
+        <span><b>${e.pending}</b> pending</span>
+        <span><b>${e.failed}</b> failed</span>
+        ${s.reference && e.env !== s.reference ? `<span><b>${e.drift}</b> differ from ${esc(s.reference)}</span>` : ''}
+      </div>${note}
+    </div>`;
+  }).join('');
+}
+
+function renderMatrix(s) {
+  const head = `<tr><th>Version</th><th>Description</th>${ENVS.map((e) => `<th>${e}</th>`).join('')}</tr>`;
+  if (!s.rows.length) {
+    document.getElementById('matrix').innerHTML = head + '<tr><td colspan="5" class="empty">No migrations found.</td></tr>';
+    return;
+  }
+  const body = s.rows.map((r) => {
+    const ver = r.version ? `V${esc(r.version)}` : 'R';
+    const cells = ENVS.map((env) => {
+      const c = r.cells[env];
+      if (!c) return '<td>—</td>';
+      return `<td>${badge(c.status, LABEL[c.status])}${c.mismatch ? '<span class="tag">differs</span>' : ''}</td>`;
+    }).join('');
+    return `<tr><td class="mono">${ver}</td><td class="desc">${esc(r.description)}</td>${cells}</tr>`;
+  }).join('');
+  document.getElementById('matrix').innerHTML = head + body;
+}
+
+function renderTabs() {
+  document.getElementById('tabs').innerHTML = ENVS.map((e) =>
+    `<button class="tab ${e === selected ? 'active' : ''}" onclick="selectEnv('${e}')">${e}</button>`).join('');
+}
+
+function renderHistory(s) {
+  const env = s.envs.find((e) => e.env === selected);
+  const head = `<tr><th>Rank</th><th>Version</th><th>Description</th><th>Type</th><th>Checksum</th>
+    <th>Installed by</th><th>Installed on</th><th>Time</th><th>Result</th></tr>`;
+  if (!env || !env.history.length) {
+    document.getElementById('history').innerHTML = head +
+      `<tr><td colspan="9" class="empty">${env && env.initialised ? 'History is empty.' : 'No history table yet. Run migrate for this environment.'}</td></tr>`;
+    return;
+  }
+  const body = env.history.map((h) => `<tr>
+    <td>${esc(h.installed_rank)}</td>
+    <td class="mono">${h.version ? esc(h.version) : 'R'}</td>
+    <td class="desc">${esc(h.description)}</td>
+    <td>${esc(h.type)}</td>
+    <td class="mono">${esc(h.checksum)}</td>
+    <td>${esc(h.installed_by)}</td>
+    <td>${esc(new Date(h.installed_on).toLocaleString())}</td>
+    <td>${esc(h.execution_time)} ms</td>
+    <td>${h.success ? badge('applied', 'Success') : badge('failed', 'Failed')}</td>
+  </tr>`).join('');
+  document.getElementById('history').innerHTML = head + body;
+}
+
+function render(s) {
+  lastState = s;
+  renderBanner(s); renderCards(s); renderMatrix(s); renderTabs(); renderHistory(s);
+  document.getElementById('dot').className = 'dot';
+  document.getElementById('updated').textContent = 'Updated ' + new Date(s.generatedAt).toLocaleTimeString();
+}
+
+function selectEnv(e) {
+  selected = e;
+  if (lastState) { renderTabs(); renderHistory(lastState); }
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/state', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    render(await r.json());
+  } catch (err) {
+    document.getElementById('dot').className = 'dot off';
+    document.getElementById('updated').textContent = 'Dashboard server unreachable';
+  }
+}
+load();
+setInterval(load, 3000);
+</script>
+</body>
+</html>

@@ -6,7 +6,7 @@ param(
 $fw = @("compose", "run", "--rm", "flyway", "-configFiles=/flyway/conf/$Target.conf")
 
 switch ($Command) {
-    "up"       { docker compose up -d postgres }
+    "up"       { docker compose up -d --build postgres dashboard }
     "info"     { docker @fw info }
     "validate" { docker @fw validate }
     "migrate"  { docker @fw migrate }

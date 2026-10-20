@@ -24,5 +24,20 @@ services:
       - ./sql:/flyway/sql
       - ./conf:/flyway/conf
 
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./sql:/sql:ro
+    environment:
+      PGHOST: postgres
+      PGUSER: admin
+      PGPASSWORD: admin123
+
+
 volumes:
   pgdata:

@@ -3,7 +3,7 @@ ENV ?= dev
 FW = docker compose run --rm flyway -configFiles=/flyway/conf/$(ENV).conf
 
 up:
-> docker compose up -d postgres
+> docker compose up -d --build postgres dashboard
 
 info:
 > $(FW) info
