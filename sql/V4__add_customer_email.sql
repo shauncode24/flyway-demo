@@ -1,0 +1,1 @@
+ALTER TABLE customers ADD COLUMN email VARCHAR(150);
