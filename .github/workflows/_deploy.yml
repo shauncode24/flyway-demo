@@ -22,8 +22,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Before
         run: $FLYWAY info
-      - name: Validate (fails on checksum mismatch)
-        run: $FLYWAY validate
+      - name: Validate (fails on checksum mismatch; pending migrations are fine)
+        run: $FLYWAY -ignoreMigrationPatterns=*:pending validate
       - name: Migrate (fails on bad SQL; Postgres rolls back the failed DDL)
         run: $FLYWAY migrate
       - name: After
