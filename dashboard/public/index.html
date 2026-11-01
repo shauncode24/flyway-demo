@@ -61,6 +61,9 @@
   .tab { border:1px solid var(--border); background:var(--bg); color:var(--text); padding:6px 14px; border-radius:8px; cursor:pointer; font:inherit; font-size:.85rem; }
   .tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
   footer { color:var(--muted); font-size:.8rem; text-align:center; }
+  html.present { font-size:22px; }
+  html.present .wrap { max-width:1600px; }
+  .changed { color:var(--accent); font-weight:600; }
   .empty { color:var(--muted); padding:12px 0; }
 </style>
 </head>
@@ -71,7 +74,7 @@
       <h1>Flyway Migration Dashboard</h1>
       <div class="sub">PostgreSQL schema versions across dev, test and prod</div>
     </div>
-    <div class="live"><span class="dot" id="dot"></span><span id="updated">Loading…</span></div>
+    <div class="live"><span class="changed" id="changed"></span><span class="dot" id="dot"></span><span id="updated">Loading…</span></div>
   </header>
 
   <div id="banner"></div>
@@ -79,7 +82,7 @@
 
   <div class="section">
     <h3>Migration matrix</h3>
-    <p class="hint">Every migration file against every environment. Baselined means the database was adopted at that version, so the file is covered without being run. Pending means the file exists but has not been applied. “differs” means the stored checksum is not the same as in the reference environment.</p>
+    <p class="hint">Every migration file against every environment. Baselined means the database was adopted at that version, so the file is covered without being run. Pending means the file exists but has not been applied. “out of order” means it was applied after a higher version. “differs” means the stored checksum is not the same as in the reference environment.</p>
     <div class="scroll"><table id="matrix"></table></div>
   </div>
 
@@ -90,7 +93,7 @@
     <div class="scroll"><table id="history"></table></div>
   </div>
 
-  <footer>Read-only view. Refreshes every 3 seconds. This page never changes any database.</footer>
+  <footer>Read-only view. Refreshes every 3 seconds. This page never changes any database. Press P for presentation mode.</footer>
 </div>
 
 <script>
@@ -101,6 +104,7 @@ const LABEL = {
 };
 let selected = 'dev';
 let lastState = null;
+let lastSig = null;
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -148,7 +152,7 @@ function renderMatrix(s) {
     const cells = ENVS.map((env) => {
       const c = r.cells[env];
       if (!c) return '<td>—</td>';
-      return `<td>${badge(c.status, LABEL[c.status])}${c.mismatch ? '<span class="tag">differs</span>' : ''}</td>`;
+      return `<td>${badge(c.status, LABEL[c.status])}${c.mismatch ? '<span class="tag">differs</span>' : ''}${c.outOfOrder ? '<span class="tag">out of order</span>' : ''}</td>`;
     }).join('');
     return `<tr><td class="mono">${ver}</td><td class="desc">${esc(r.description)}</td>${cells}</tr>`;
   }).join('');
@@ -184,6 +188,12 @@ function renderHistory(s) {
 }
 
 function render(s) {
+  const sig = JSON.stringify([s.envs.map((e) => [e.status, e.current, e.history.length]),
+    s.rows.map((r) => ENVS.map((n) => r.cells[n] && [r.cells[n].status, r.cells[n].checksum]))]);
+  if (lastSig !== null && sig !== lastSig) {
+    document.getElementById('changed').textContent = 'Changed ' + new Date().toLocaleTimeString() + ' ·';
+  }
+  lastSig = sig;
   lastState = s;
   renderBanner(s); renderCards(s); renderMatrix(s); renderTabs(); renderHistory(s);
   document.getElementById('dot').className = 'dot';
@@ -205,6 +215,11 @@ async function load() {
     document.getElementById('updated').textContent = 'Dashboard server unreachable';
   }
 }
+// Presentation mode: larger text for a projector. Toggle with P, or open /?present
+const togglePresent = (on) => document.documentElement.classList.toggle('present', on);
+if (new URLSearchParams(location.search).has('present')) togglePresent(true);
+document.addEventListener('keydown', (e) => { if (e.key === 'p' || e.key === 'P') togglePresent(); });
+
 load();
 setInterval(load, 3000);
 </script>

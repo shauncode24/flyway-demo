@@ -13,6 +13,12 @@ Every step is a command. Keep the dashboard (http://localhost:3000) open next to
    Use `.\run.ps1 demo-reset -Force` to discard uncommitted edits in `sql/` (e.g. a leftover Scenario A edit).
 4. Do one complete dry run of this whole document at least once beforehand.
 
+   Optional: `.\run.ps1 doctor` checks ports, the git tree and the demo files. Open the dashboard with
+   `http://localhost:3000/?present` (or press `P`) for large text on a projector.
+
+Helpers during the demo: `.\run.ps1 status` (info for all three environments), `.\run.ps1 compare test`
+(is test's history identical to dev's?), `.\run.ps1 scenario C` (cheat card for a scenario).
+
 Return to a clean state at any point with `.\run.ps1 demo-reset`.
 
 ---

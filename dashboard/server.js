@@ -105,6 +105,19 @@ function buildState(files, results) {
     byEnv[res.env] = m;
   }
 
+  // Out-of-order migrations: a versioned row applied after a higher version was already applied.
+  const outOfOrder = {};
+  for (const res of results) {
+    const set = new Set();
+    let max = null;
+    for (const r of res.rows) {
+      if (r.type === 'SCHEMA' || r.type === 'BASELINE' || !r.version) continue;
+      if (max !== null && cmpVersion(String(r.version), max) < 0) set.add(keyOf(r.version, r.description));
+      else max = String(r.version);
+    }
+    outOfOrder[res.env] = set;
+  }
+
   // Baseline version per environment (a BASELINE row marks everything up to it as covered).
   const baselineOf = {};
   for (const res of results) {
@@ -131,7 +144,7 @@ function buildState(files, results) {
         if (rh && rh.success && h.success && rh.checksum !== h.checksum) mismatch = true;
       }
       cells[res.env] = h
-        ? { status, mismatch, checksum: h.checksum, installedOn: h.installed_on, executionTime: h.execution_time }
+        ? { status, mismatch, outOfOrder: outOfOrder[res.env].has(mig.key), checksum: h.checksum, installedOn: h.installed_on, executionTime: h.execution_time }
         : { status, mismatch };
     }
     return {
