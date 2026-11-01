@@ -34,7 +34,7 @@ jobs:
   # Only on main, only after the gate passes. Stops at the first failure,
   # so a bad migration never reaches test or prod.
   dev:
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main'   # never deploy from a PR or another branch
     needs: migrate-from-scratch
     uses: ./.github/workflows/_deploy.yml
     with: { environment: dev }

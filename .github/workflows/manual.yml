@@ -47,7 +47,7 @@ jobs:
       - name: Guard rails
         run: |
           case "$ACTION" in
-            reset-schema|load-legacy-schema)
+            load-legacy-schema)
               if [ "$ENVIRONMENT" = "prod" ]; then echo "$ACTION is not allowed on prod."; exit 1; fi ;;
           esac
           case "$ACTION" in
@@ -73,9 +73,8 @@ jobs:
             reset-schema)         flyway -cleanDisabled=false clean && flyway info ;;
             load-legacy-schema)
               # Builds the hand-made, non-Flyway tables inside the chosen schema
-              docker run --rm -i \
-                -e PGUSER="$DB_USER" -e PGPASSWORD="$DB_PASSWORD" \
-                -e PGOPTIONS="-c search_path=$ENVIRONMENT" \
-                postgres:16 psql "${DB_URL#jdbc:}" -v ON_ERROR_STOP=1 < demo/legacy_schema.sql
+              { echo "SET search_path TO $ENVIRONMENT;"; cat demo/legacy_schema.sql; } | \
+                docker run --rm -i -e PGUSER="$DB_USER" -e PGPASSWORD="$DB_PASSWORD" \
+                postgres:16 psql "${DB_URL#jdbc:}" -v ON_ERROR_STOP=1
               ;;
           esac
