@@ -1,0 +1,43 @@
+name: Flyway migrations
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  migrate-from-scratch:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ci_db
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin123
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin -d ci_db"
+          --health-interval 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Migrate a fresh database
+        run: |
+          docker run --rm --network host -v "${{ github.workspace }}/sql:/flyway/sql" flyway/flyway:10 \
+            -url=jdbc:postgresql://localhost:5432/ci_db -user=admin -password=admin123 \
+            -locations=filesystem:/flyway/sql migrate
+
+      - name: Validate checksums
+        run: |
+          docker run --rm --network host -v "${{ github.workspace }}/sql:/flyway/sql" flyway/flyway:10 \
+            -url=jdbc:postgresql://localhost:5432/ci_db -user=admin -password=admin123 \
+            -locations=filesystem:/flyway/sql validate
+
+      - name: Show migration history
+        run: |
+          docker run --rm --network host -v "${{ github.workspace }}/sql:/flyway/sql" flyway/flyway:10 \
+            -url=jdbc:postgresql://localhost:5432/ci_db -user=admin -password=admin123 \
+            -locations=filesystem:/flyway/sql info
