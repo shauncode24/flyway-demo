@@ -35,10 +35,16 @@ services:
         condition: service_healthy
     volumes:
       - ./sql:/sql:ro
+    # Local sandbox by default. To read the Supabase schemas instead, put the values from
+    # .env.example into a git-ignored .env file (PG_SCHEMAS=true, PGSSL=true, pooler host/user).
     environment:
-      PGHOST: postgres
-      PGUSER: admin
-      PGPASSWORD: admin123
+      PGHOST: ${PGHOST:-postgres}
+      PGPORT: ${PGPORT:-5432}
+      PGUSER: ${PGUSER:-admin}
+      PGPASSWORD: ${PGPASSWORD:-admin123}
+      PGDATABASE: ${PGDATABASE:-postgres}
+      PG_SCHEMAS: ${PG_SCHEMAS:-false}
+      PGSSL: ${PGSSL:-false}
 
 
 volumes:

@@ -112,19 +112,35 @@ switch ($Command) {
 
     # Cheat card for a scenario: .\run.ps1 scenario C
     "scenario" {
+        # Cloud pipeline flow: stage, commit, push, then read the Actions run graph.
+        # "[Actions]" lines are clicks in GitHub: Actions tab, "Manual Flyway operations", Run workflow.
+        $push = 'git add sql; git commit -m "<msg>"; git push'
         $cards = @{
             A = @("Checksum mismatch: applied history is protected",
-                  'Add-Content sql\V2__create_products.sql "-- harmless comment"', ".\run.ps1 validate   # FAILS", ".\run.ps1 migrate    # refuses", "git checkout sql/V2__create_products.sql", ".\run.ps1 validate   # passes (or: .\run.ps1 repair if the change was intentional)")
+                  'Add-Content sql\V2__create_products.sql "-- harmless comment"', $push, "[Actions] gate green, dev RED at Validate, test/prod skipped",
+                  "git revert HEAD --no-edit; git push   # green again",
+                  "(or keep the edit: [Actions] manual repair on dev, confirm=dev; re-run; repeat on test and prod)")
             B = @("Wrong migration that succeeded: roll forward",
-                  ".\run.ps1 stage B1", ".\run.ps1 migrate", ".\run.ps1 stage B2", ".\run.ps1 migrate", ".\run.ps1 psql   # \d customers")
-            C = @("Failed migration: PostgreSQL rolls back",
-                  ".\run.ps1 stage C1", ".\run.ps1 migrate   # FAILS", ".\run.ps1 info      # V11 still Pending", ".\run.ps1 stage C2", ".\run.ps1 migrate", ".\run.ps1 migrate-all   # level test/prod before scenario D")
+                  ".\run.ps1 stage B1", $push, "[Actions] all green: the typo (phon) is now in dev, test and prod",
+                  ".\run.ps1 stage B2", $push, "[Actions] all green: V10 renames phon to phone")
+            C = @("Failed migration: the gate catches it",
+                  ".\run.ps1 stage C1", $push, "[Actions] gate RED (rolled back), dev/test/prod skipped",
+                  ".\run.ps1 stage C2", $push, "[Actions] all green")
             D = @("Repeatable migration: tracks content, not version",
-                  ".\run.ps1 migrate-all", ".\run.ps1 stage D", ".\run.ps1 migrate   # dashboard: test/prod show 'differs'", ".\run.ps1 compare test", ".\run.ps1 migrate-all", ".\run.ps1 compare test")
+                  ".\run.ps1 stage D", $push, "[Actions] all green; only the view is re-applied (old row Superseded)",
+                  "(with a required reviewer on test/prod the run pauses: environments differ until you approve)")
             E = @("Version conflict and out-of-order",
-                  ".\run.ps1 stage E1", ".\run.ps1 migrate   # FAILS: duplicate V12", "Rename-Item sql\V12__add_loyalty_tier.sql V13__add_loyalty_tier.sql", ".\run.ps1 migrate", ".\run.ps1 stage E3", ".\run.ps1 migrate   # FAILS validation", ".\run.ps1 migrate-ooo")
+                  ".\run.ps1 stage E1", $push, "[Actions] gate RED: duplicate version 12",
+                  "Rename-Item sql\V12__add_loyalty_tier.sql V13__add_loyalty_tier.sql", $push, "[Actions] all green (V12 and V13)",
+                  ".\run.ps1 stage E3", $push, "[Actions] gate green, dev RED at Validate (V12.5 below V13)",
+                  "[Actions] manual migrate-out-of-order on dev, then test, then prod",
+                  "[Actions] re-run 'Flyway migrations' on main: green")
             F = @("Baselining an existing database",
-                  ".\run.ps1 demo-reset -Force", ".\run.ps1 down", ".\run.ps1 up", ".\run.ps1 legacy", ".\run.ps1 migrate   # refused", ".\run.ps1 baseline", ".\run.ps1 info", ".\run.ps1 stage F", ".\run.ps1 migrate")
+                  "First reset to baseline (PROJECT.md 8.5) so sql/ holds V1-V8 only. Do NOT push until the last step.",
+                  "[Actions] manual on dev: reset-schema (confirm=dev)", "[Actions] manual on dev: load-legacy-schema",
+                  "[Actions] manual on dev: migrate   # RED on purpose: non-empty schema, no history",
+                  "[Actions] manual on dev: baseline (version 8)", "[Actions] manual on dev: info   # Below Baseline + Baseline row",
+                  ".\run.ps1 stage F", $push, "[Actions] all green: dev applies only V9 + view")
         }
         $key = $Arg.ToUpper()
         if (-not $cards.ContainsKey($key)) { Write-Host "Usage: .\run.ps1 scenario <A|B|C|D|E|F>" -ForegroundColor Red; exit 1 }

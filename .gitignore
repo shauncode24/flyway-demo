@@ -1,4 +1,6 @@
 .env
 *.log
 .DS_Store
-dashboard/node_modules
+dashboard/node_modules
+*.env
+!.env.example

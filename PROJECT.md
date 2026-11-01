@@ -157,7 +157,8 @@ PostgreSQL supports transactional DDL, so a migration that fails part-way is rol
 | `docker-compose.yml`, `init/`, `conf/` | The optional local sandbox (Postgres with `dev_db`, `test_db`, `prod_db`; Flyway configs) |
 | `dashboard/` | `server.js`, `public/index.html`, `Dockerfile`, `package.json` |
 | `Makefile` | Same local commands for Mac/Linux (not run on this Windows machine) |
-| `DEMO.md`, `README.md`, `docs/REPORT.md` | Earlier runbook, overview and report draft; this file supersedes them |
+| `DEMO.md`, `README.md`, `docs/REPORT.md`, `docs/windows-powershell-commands.md` | Short runbook, overview, written report and PowerShell reference, all derived from this file |
+| `.env.example` | Template for the dashboard's cloud settings (copy to the git-ignored `.env`) |
 | `PROJECT.md` | This file |
 
 ## 2.3 Configuration and secrets
@@ -403,7 +404,7 @@ The dashboard has two modes, chosen by environment variables:
 | **Local** (default) | `PGHOST`, `PGUSER`, `PGPASSWORD` | `dev_db`, `test_db`, `prod_db`, table `public.flyway_schema_history` |
 | **Cloud schemas** | `PG_SCHEMAS=true`, `PGDATABASE=postgres`, `PGHOST=aws-0-<region>.pooler.supabase.com`, `PGPORT=5432`, `PGUSER=postgres.<project-ref>`, `PGPASSWORD`, `PGSSL=true` | Schemas `dev`, `test`, `prod` in one database, table `<schema>.flyway_schema_history` |
 
-The variables belong in a git-ignored `.env` file that Docker Compose reads. **Status: the cloud mode is implemented in `dashboard/server.js` but the compose wiring and a live check against Supabase are not yet done (section 12).** The dashboard also reads the `sql/` folder (mounted read-only) to list files that exist but are not applied, so it should be run from a working copy at the commit being deployed.
+The variables belong in a git-ignored `.env` file (copy `.env.example`) that Docker Compose reads; `docker-compose.yml` passes them to the dashboard with local defaults, so without a `.env` the dashboard stays in local mode. **Status: the cloud mode is implemented in `dashboard/server.js` and wired in `docker-compose.yml` (`docker compose config` is valid), but it has not yet been checked against Supabase (section 12).** The dashboard also reads the `sql/` folder (mounted read-only) to list files that exist but are not applied, so it should be run from a working copy at the commit being deployed.
 
 ## 5.4 Behaviour in special situations
 
@@ -969,12 +970,12 @@ Risks to manage before presenting:
 2. **Scenarios A to F through the pipeline** have not been run; only the first all-green deployment has. Rehearse each, including the reset in 8.5.
 3. **`demo-baseline` tag** has to be created on the commit whose `sql/` holds V1 to V8 only.
 4. **Approval gate** on `prod` (and optionally `test`) has not been set up or observed.
-5. **Dashboard cloud mode** is implemented (`PG_SCHEMAS`, `PGSSL`) but `docker-compose.yml` does not yet pass these variables, there is no `.env` or `.gitignore` entry, and it has not been checked against Supabase.
-6. **Secrets files.** If secrets are loaded from `*.env` files with the `gh` CLI, those must be git-ignored.
+5. **Dashboard cloud mode** is implemented (`PG_SCHEMAS`, `PGSSL`) and wired in `docker-compose.yml` with a `.env.example`, but it has not been checked against Supabase. Create `.env` from the example, run `.\run.ps1 up`, and look at `http://localhost:3000`.
+6. **Secrets files.** `.gitignore` now excludes `.env` and `*.env` (but keeps `.env.example`); still keep the actual secret values out of any committed file.
 7. **Screenshots** have not been taken.
 8. **V5 backfill** is a no-op on a fresh database (see 3.2). Decide whether to leave it and state it, or seed rows earlier (changes checksums of applied files).
 9. **Makefile** was updated to match `run.ps1` but not executed (no `make` on this Windows machine).
-10. **Older documents.** `DEMO.md`, `README.md` and `docs/REPORT.md` still describe the local-only workflow and should be regenerated from this file or marked superseded.
+10. **Other documents.** `README.md`, `DEMO.md`, `docs/REPORT.md`, `docs/windows-powershell-commands.md` and the `run.ps1 scenario` cheat cards now follow the cloud pipeline flow. They are derived from this file and have not been rehearsed; if a step is wrong, fix it here and in the matching document.
 11. **Final report and slides** are produced from section 9 of this file.
 
 ## 12.3 Glossary
