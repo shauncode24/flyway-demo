@@ -45,7 +45,7 @@
   .b-failed,.b-unreachable { background:var(--red-bg); color:var(--red); }
   .b-pending,.b-uninitialised { background:var(--amber-bg); color:var(--amber); }
   .b-drift { background:var(--purple-bg); color:var(--purple); }
-  .b-absent { background:var(--gray-bg); color:var(--muted); }
+  .b-baselined,.b-absent { background:var(--gray-bg); color:var(--muted); }
   .section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:24px; }
   .section h3 { margin:0 0 4px; font-size:1.05rem; }
   .section p.hint { margin:0 0 14px; color:var(--muted); font-size:.85rem; }
@@ -79,7 +79,7 @@
 
   <div class="section">
     <h3>Migration matrix</h3>
-    <p class="hint">Every migration file against every environment. Pending means the file exists but has not been applied. “differs” means the stored checksum is not the same as in the reference environment.</p>
+    <p class="hint">Every migration file against every environment. Baselined means the database was adopted at that version, so the file is covered without being run. Pending means the file exists but has not been applied. “differs” means the stored checksum is not the same as in the reference environment.</p>
     <div class="scroll"><table id="matrix"></table></div>
   </div>
 
@@ -96,7 +96,7 @@
 <script>
 const ENVS = ['dev', 'test', 'prod'];
 const LABEL = {
-  applied: 'Applied', failed: 'Failed', pending: 'Pending', absent: '—',
+  applied: 'Applied', baselined: 'Baselined', failed: 'Failed', pending: 'Pending', absent: '—',
   sync: 'In sync', drift: 'Drifted', unreachable: 'Unreachable', uninitialised: 'Not initialised'
 };
 let selected = 'dev';

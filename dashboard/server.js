@@ -105,6 +105,13 @@ function buildState(files, results) {
     byEnv[res.env] = m;
   }
 
+  // Baseline version per environment (a BASELINE row marks everything up to it as covered).
+  const baselineOf = {};
+  for (const res of results) {
+    const b = res.rows.find((r) => r.type === 'BASELINE');
+    baselineOf[res.env] = b ? String(b.version) : null;
+  }
+
   const ref = results.find((r) => r.env === 'dev' && r.initialised) || results.find((r) => r.initialised);
   const refEnv = ref ? ref.env : null;
 
@@ -113,7 +120,10 @@ function buildState(files, results) {
     for (const res of results) {
       const h = byEnv[res.env].get(mig.key);
       let status;
-      if (h) status = h.success ? 'applied' : 'failed';
+      const bv = baselineOf[res.env];
+      if (h && h.type === 'BASELINE') status = 'baselined';
+      else if (h) status = h.success ? 'applied' : 'failed';
+      else if (bv && mig.kind === 'V' && cmpVersion(mig.version, bv) <= 0) status = 'baselined';
       else status = mig.onDisk ? 'pending' : 'absent';
       let mismatch = false;
       if (h && refEnv && res.env !== refEnv) {
@@ -150,7 +160,7 @@ function buildState(files, results) {
       if (refEnv && res.env !== refEnv) {
         if (c.mismatch || c.status !== row.cells[refEnv].status) out.drift++;
       }
-      if (c.status === 'applied' && row.kind === 'V') {
+      if ((c.status === 'applied' || c.status === 'baselined') && row.kind === 'V') {
         if (!out.current || cmpVersion(row.version, out.current) > 0) out.current = row.version;
       }
     }

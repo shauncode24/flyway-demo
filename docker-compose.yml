@@ -10,7 +10,9 @@ services:
       - ./init:/docker-entrypoint-initdb.d
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d postgres"]
+      # -h localhost forces TCP: the temporary init-time server only listens on the
+      # unix socket, so this stays unhealthy until the init script has finished.
+      test: ["CMD-SHELL", "pg_isready -h localhost -U admin -d postgres"]
       interval: 5s
       retries: 10
 

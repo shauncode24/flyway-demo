@@ -1,0 +1,1 @@
+ALTER TABLE customers ADD COLUMN phon VARCHAR(15);
