@@ -1,10 +1,13 @@
 name: Flyway migrations
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
+  # Gate: every change must apply cleanly to an empty throwaway database first.
   migrate-from-scratch:
     runs-on: ubuntu-latest
     services:
@@ -21,23 +24,30 @@ jobs:
           --health-interval 5s
           --health-retries 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Migrate a fresh database
         run: |
           docker run --rm --network host -v "${{ github.workspace }}/sql:/flyway/sql" flyway/flyway:10 \
             -url=jdbc:postgresql://localhost:5432/ci_db -user=admin -password=admin123 \
-            -locations=filesystem:/flyway/sql migrate
+            -locations=filesystem:/flyway/sql -validateMigrationNaming=true migrate validate info
 
-      - name: Validate checksums
-        run: |
-          docker run --rm --network host -v "${{ github.workspace }}/sql:/flyway/sql" flyway/flyway:10 \
-            -url=jdbc:postgresql://localhost:5432/ci_db -user=admin -password=admin123 \
-            -locations=filesystem:/flyway/sql validate
+  # Only on main, only after the gate passes. Stops at the first failure,
+  # so a bad migration never reaches test or prod.
+  dev:
+    if: github.event_name != 'pull_request'
+    needs: migrate-from-scratch
+    uses: ./.github/workflows/_deploy.yml
+    with: { environment: dev }
+    secrets: inherit
 
-      - name: Show migration history
-        run: |
-          docker run --rm --network host -v "${{ github.workspace }}/sql:/flyway/sql" flyway/flyway:10 \
-            -url=jdbc:postgresql://localhost:5432/ci_db -user=admin -password=admin123 \
-            -locations=filesystem:/flyway/sql info
+  test:
+    needs: dev
+    uses: ./.github/workflows/_deploy.yml
+    with: { environment: test }
+    secrets: inherit
+
+  prod:
+    needs: test
+    uses: ./.github/workflows/_deploy.yml
+    with: { environment: prod }
+    secrets: inherit

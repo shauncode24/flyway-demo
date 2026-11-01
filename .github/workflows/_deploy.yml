@@ -1,0 +1,30 @@
+# Reusable: run Flyway against ONE environment (dev, test or prod) in the cloud database.
+# Each GitHub Environment holds its own secrets: DB_URL, DB_USER, DB_PASSWORD.
+name: Deploy to one environment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}   # prod can require a manual approval here
+    env:
+      FLYWAY: >-
+        docker run --rm -v ${{ github.workspace }}/sql:/flyway/sql flyway/flyway:10
+        -url=${{ secrets.DB_URL }} -user=${{ secrets.DB_USER }} -password=${{ secrets.DB_PASSWORD }}
+        -locations=filesystem:/flyway/sql -schemas=${{ inputs.environment }} -validateMigrationNaming=true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Before
+        run: $FLYWAY info
+      - name: Validate (fails on checksum mismatch)
+        run: $FLYWAY validate
+      - name: Migrate (fails on bad SQL; Postgres rolls back the failed DDL)
+        run: $FLYWAY migrate
+      - name: After
+        run: $FLYWAY info

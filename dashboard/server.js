@@ -10,6 +10,12 @@ const ENVS = ['dev', 'test', 'prod'];
 const PORT = 3000;
 const SQL_DIR = process.env.SQL_DIR || '/sql';
 
+// Local mode: one database per environment (dev_db, test_db, prod_db), schema public.
+// Cloud mode (PG_SCHEMAS=true): one database (PGDATABASE), one schema per environment.
+const SCHEMA_MODE = process.env.PG_SCHEMAS === 'true';
+const dbName = (env) => (SCHEMA_MODE ? process.env.PGDATABASE || 'postgres' : `${env}_db`);
+const schemaName = (env) => (SCHEMA_MODE ? env : 'public');
+
 function dbConfig(db) {
   return {
     host: process.env.PGHOST || 'postgres',
@@ -18,21 +24,22 @@ function dbConfig(db) {
     password: process.env.PGPASSWORD || 'admin123',
     database: db,
     connectionTimeoutMillis: 3000,
+    ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined,
   };
 }
 
 async function readEnv(env) {
-  const client = new Client(dbConfig(`${env}_db`));
+  const client = new Client(dbConfig(dbName(env)));
   try {
     await client.connect();
-    const exists = await client.query("SELECT to_regclass('public.flyway_schema_history') AS t");
+    const exists = await client.query("SELECT to_regclass($1) AS t", [`${schemaName(env)}.flyway_schema_history`]);
     if (!exists.rows[0].t) {
       return { env, reachable: true, initialised: false, rows: [] };
     }
     const r = await client.query(
       `SELECT installed_rank, version, description, type, script, checksum,
               installed_by, installed_on, execution_time, success
-       FROM flyway_schema_history ORDER BY installed_rank`
+       FROM ${schemaName(env)}.flyway_schema_history ORDER BY installed_rank`
     );
     return { env, reachable: true, initialised: true, rows: r.rows };
   } catch (e) {
