@@ -463,6 +463,8 @@ Either revert the changes to the migration, or run repair to update the schema h
 
 **Lesson.** Applied history cannot be silently rewritten, and the pipeline enforces this on every environment, not just the developer's.
 
+**What if a real change is needed?** Do not edit the applied file. Add a new migration (for example `V9__alter_products.sql`) and push it; the pipeline applies it to every environment. Editing an applied script is wrong for three reasons: the databases already ran the old text, so the file would no longer describe what is actually in them; a new database built from the edited files would differ from the existing ones; and Flyway would never re-run the edited file anyway. `repair` is only for a harmless edit (a comment or formatting) that does not change what the SQL does, because it just updates the stored checksum and runs nothing.
+
 ## Scenario B: wrong migration that succeeded (roll forward)
 
 **Problem.** A migration with a typo (`phon` instead of `phone`) is valid SQL, so it applies. Nothing fails; the mistake is simply in the database.
